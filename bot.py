@@ -9,6 +9,8 @@ from aiogram.fsm.state import StatesGroup, State
 import asyncio
 
 from models import init_db
+from models.db import SessionLocal
+from parsers.auto_ru import AutoRu
 
 load_dotenv()
 TOKEN = getenv("BOT_TOKEN")
@@ -59,9 +61,24 @@ async def start(message: Message):
 
 @dp.message(F.text == "Найти")
 async def get_preferences(message: Message):
-    from parsers import auto_parser
+    from parsers import auto_ru
+    import models.crud as crud
 
 
+    db = SessionLocal()
+    try:
+        user_preferences = crud.get_preferences(
+            db,
+            telegram_id=message.from_user.id
+        )
+        parser = AutoRu(preferences=user_preferences, limit=5)
+        cars = parser.parse()
+        parser.close()
+
+        await message.answer(f'Найдено {len(cars)} автомобилей:\n' + '\n'.join([f"{c['maker']} {c['model']} - {c['year']} - {c['price']}" for c in cars]))
+
+    finally:
+        db.close()
 @dp.message(F.text == "Просмотр предпочтений")
 async def get_preferences(message: Message):
     from models.db import SessionLocal
@@ -126,7 +143,7 @@ async def process_price(message: Message, state: FSMContext):
 
 @dp.message(PreferencesForm.year)
 async def process_year(message: Message, state: FSMContext):
-    if message.text.isdigit() and len(message.text) == 4:
+    if message.text.isdigit() and len(message.text) == 8:
         await message.answer("Год должен состоять из 4 цифр")
         return
 
@@ -153,12 +170,6 @@ async def process_year(message: Message, state: FSMContext):
                          f"Цена: {data['price']} ₽\n"
                          f"Год: {data['year']}")
     await state.clear()
-
-
-@dp.message(F.text == "Отмена")
-async def cancel(message: Message, state: FSMContext):
-    await state.clear()
-    await message.answer("Ввод предпочтений отменен", reply_markup=markup)
 
 
 async def main():
