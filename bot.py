@@ -79,6 +79,8 @@ async def get_preferences(message: Message):
 
     finally:
         db.close()
+
+
 @dp.message(F.text == "Просмотр предпочтений")
 async def get_preferences(message: Message):
     from models.db import SessionLocal
